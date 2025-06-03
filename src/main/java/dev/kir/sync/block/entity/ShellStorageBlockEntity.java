@@ -58,24 +58,29 @@ public class ShellStorageBlockEntity extends AbstractShellContainerBlockEntity i
         super.onServerTick(world, pos, state);
 
         SyncConfig config = Sync.getConfig();
-        boolean isReceivingRedstonePower = config.shellStorageAcceptsRedstone() && ShellStorageBlock.isEnabled(state);
-        boolean hasEnergy = this.storedEnergy > 0;
-        boolean isPowered = isReceivingRedstonePower || hasEnergy;
+        boolean infinitePower = config.shellStorageConsumption() == 0;
+        boolean isReceivingRedstonePower = !infinitePower
+                && config.shellStorageAcceptsRedstone()
+                && ShellStorageBlock.isEnabled(state);
+        boolean hasEnergy = infinitePower ? true : this.storedEnergy > 0;
+        boolean isPowered = infinitePower || isReceivingRedstonePower || hasEnergy;
         boolean shouldBeOpen = isPowered && this.getBottomPart().map(x -> x.shell == null).orElse(true);
 
         ShellStorageBlock.setPowered(state, world, pos, isPowered);
         ShellStorageBlock.setOpen(state, world, pos, shouldBeOpen);
 
-        if (this.shell != null && !isPowered) {
-            ++this.ticksWithoutPower;
-            if (this.ticksWithoutPower >= config.shellStorageMaxUnpoweredLifespan()) {
-                this.destroyShell((ServerWorld)world, pos);
+        if (!infinitePower) {
+            if (this.shell != null && !isPowered) {
+                ++this.ticksWithoutPower;
+                if (this.ticksWithoutPower >= config.shellStorageMaxUnpoweredLifespan()) {
+                    this.destroyShell((ServerWorld)world, pos);
+                }
+            } else {
+                this.ticksWithoutPower = 0;
             }
-        } else {
-            this.ticksWithoutPower = 0;
         }
 
-        if (!isReceivingRedstonePower && hasEnergy) {
+        if (!infinitePower && !isReceivingRedstonePower && hasEnergy) {
             this.storedEnergy = (long) MathHelper.clamp(this.storedEnergy - config.shellStorageConsumption(), 0, config.shellStorageCapacity());
         }
     }
@@ -130,7 +135,7 @@ public class ShellStorageBlockEntity extends AbstractShellContainerBlockEntity i
 
     @Override
     public boolean supportsInsertion() {
-        return true;
+        return Sync.getConfig().shellStorageConsumption() != 0;
     }
 
     @Override
@@ -140,6 +145,10 @@ public class ShellStorageBlockEntity extends AbstractShellContainerBlockEntity i
 
     @Override
     public long insert(long amount, TransactionContext context) {
+        if (Sync.getConfig().shellStorageConsumption() == 0) {
+            return 0;
+        }
+
         ShellStorageBlockEntity bottom = (ShellStorageBlockEntity)this.getBottomPart().orElse(null);
         if (bottom == null) {
             return 0;
@@ -168,7 +177,7 @@ public class ShellStorageBlockEntity extends AbstractShellContainerBlockEntity i
 
     @Override
     public long getCapacity() {
-        return Sync.getConfig().shellStorageCapacity();
+        return Sync.getConfig().shellStorageConsumption() == 0 ? 0 : Sync.getConfig().shellStorageCapacity();
     }
 
     private enum EntityState {
