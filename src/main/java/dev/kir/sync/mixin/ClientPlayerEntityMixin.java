@@ -1,33 +1,13 @@
 package dev.kir.sync.mixin;
 
-import com.mojang.authlib.GameProfile;
-import dev.kir.sync.Sync;
-import dev.kir.sync.api.event.PlayerSyncEvents;
-import dev.kir.sync.api.networking.SynchronizationRequestPacket;
-import dev.kir.sync.api.shell.ClientShell;
-import dev.kir.sync.api.shell.ShellState;
-import dev.kir.sync.client.gui.controller.DeathScreenController;
-import dev.kir.sync.client.gui.controller.HudController;
-import dev.kir.sync.api.shell.ShellPriority;
-import dev.kir.sync.config.SyncConfig;
-import dev.kir.sync.entity.KillableEntity;
-import dev.kir.sync.entity.LookingEntity;
-import dev.kir.sync.util.BlockPosUtil;
-import dev.kir.sync.entity.PersistentCameraEntity;
-import dev.kir.sync.entity.PersistentCameraEntityGoal;
-import dev.kir.sync.util.WorldUtil;
-import net.fabricmc.api.EnvType;
-import net.fabricmc.api.Environment;
-import net.minecraft.client.MinecraftClient;
-import net.minecraft.client.gui.screen.DeathScreen;
-import net.minecraft.client.network.AbstractClientPlayerEntity;
-import net.minecraft.client.network.ClientPlayerEntity;
-import net.minecraft.client.world.ClientWorld;
-import net.minecraft.network.encryption.PlayerPublicKey;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.BlockPos;
-import net.minecraft.util.math.Direction;
-import net.minecraft.util.math.MathHelper;
+import java.util.Comparator;
+import java.util.Objects;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
+
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Final;
 import org.spongepowered.asm.mixin.Mixin;
@@ -37,13 +17,34 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-import java.util.Comparator;
-import java.util.Objects;
-import java.util.UUID;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import com.mojang.authlib.GameProfile;
+
+import dev.kir.sync.Sync;
+import dev.kir.sync.api.event.PlayerSyncEvents;
+import dev.kir.sync.api.networking.SynchronizationRequestPacket;
+import dev.kir.sync.api.shell.ClientShell;
+import dev.kir.sync.api.shell.ShellPriority;
+import dev.kir.sync.api.shell.ShellState;
+import dev.kir.sync.client.gui.controller.DeathScreenController;
+import dev.kir.sync.client.gui.controller.HudController;
+import dev.kir.sync.config.SyncConfig;
+import dev.kir.sync.entity.KillableEntity;
+import dev.kir.sync.entity.LookingEntity;
+import dev.kir.sync.entity.PersistentCameraEntity;
+import dev.kir.sync.entity.PersistentCameraEntityGoal;
+import dev.kir.sync.util.BlockPosUtil;
+import dev.kir.sync.util.WorldUtil;
+import net.fabricmc.api.EnvType;
+import net.fabricmc.api.Environment;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.screen.DeathScreen;
+import net.minecraft.client.network.AbstractClientPlayerEntity;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.client.world.ClientWorld;
+import net.minecraft.util.Identifier;
+import net.minecraft.util.math.BlockPos;
+import net.minecraft.util.math.Direction;
+import net.minecraft.util.math.MathHelper;
 
 @Environment(EnvType.CLIENT)
 @Mixin(ClientPlayerEntity.class)
@@ -200,8 +201,26 @@ abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity implem
         boolean canRespawn = this.isArtificial() && this.shellsById.size() != 0;
         BlockPos pos = this.getBlockPos();
         Identifier world = WorldUtil.getId(this.getWorld());
-        Comparator<ShellState> comparator = ShellPriority.asComparator(world, pos, Sync.getConfig().syncPriority().stream().map(SyncConfig.ShellPriorityEntry::priority));
-        ShellState respawnShell = canRespawn ? this.shellsById.values().stream().filter(x -> this.canBeApplied(x) && x.getProgress() >= ShellState.PROGRESS_DONE).min(comparator).orElse(null) : null;
+        Comparator<ShellState> comparator = ShellPriority.asComparator(
+            world,
+            pos,
+            Sync.getConfig().syncPriority().stream().map(SyncConfig.ShellPriorityEntry::priority)
+        );
+
+        ShellState respawnShell = canRespawn
+            ? this.shellsById.values().stream()
+                .filter(x -> {
+                    if (!this.canBeApplied(x) || x.getProgress() < ShellState.PROGRESS_DONE) {
+                        return false;
+                    }
+                    dev.kir.sync.api.shell.ShellStateContainer container =
+                        dev.kir.sync.api.shell.ShellStateContainer.find(this.clientWorld, x);
+                    return container != null && container.isRemotelyAccessible();
+                })
+                .min(comparator)
+                .orElse(null)
+            : null;
+
         if (respawnShell != null) {
             this.beginSync(respawnShell);
         }

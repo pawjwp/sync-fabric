@@ -82,12 +82,17 @@ public class ShellConstructorBlockEntity extends AbstractShellContainerBlockEnti
 
     @Override
     public long getAmount() {
-        return 0;
+        ShellConstructorBlockEntity bottom = (ShellConstructorBlockEntity) this.getBottomPart().orElse(null);
+        if (bottom == null || bottom.shell == null) {
+            return 0;
+        }
+        long cap = Sync.getConfig().shellConstructorCapacity();
+        return (long) (bottom.shell.getProgress() * cap);
     }
 
     @Override
     public long getCapacity() {
-        return 0;
+        return Sync.getConfig().shellConstructorCapacity();
     }
 
     @Override
