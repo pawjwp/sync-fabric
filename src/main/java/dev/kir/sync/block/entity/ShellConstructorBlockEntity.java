@@ -82,12 +82,20 @@ public class ShellConstructorBlockEntity extends AbstractShellContainerBlockEnti
 
     @Override
     public long getAmount() {
-        return 0;
+        ShellConstructorBlockEntity bottom = (ShellConstructorBlockEntity)this.getBottomPart().orElse(null);
+        if (bottom == null || bottom.shell == null) {
+            return 0;
+        }
+        long cap = Sync.getConfig().shellConstructorCapacity();
+        return (long)(bottom.shell.getProgress() * cap);
     }
 
     @Override
     public long getCapacity() {
-        return 0;
+        ShellConstructorBlockEntity bottom = (ShellConstructorBlockEntity)this.getBottomPart().orElse(null);
+        return bottom != null && bottom.shell != null
+               ? Sync.getConfig().shellConstructorCapacity()
+               : 0;
     }
 
     @Override
@@ -107,14 +115,22 @@ public class ShellConstructorBlockEntity extends AbstractShellContainerBlockEnti
             return 0;
         }
 
-        long requiredEnergyAmount = Sync.getConfig().shellConstructorCapacity();
-        long maxEnergy = (long)((ShellState.PROGRESS_DONE - bottom.shell.getProgress()) * requiredEnergyAmount);
-        context.addCloseCallback((ctx, result) -> {
+        long capacity = Sync.getConfig().shellConstructorCapacity();
+        long missingFE = (long)Math.ceil((ShellState.PROGRESS_DONE - bottom.shell.getProgress()) * capacity);
+        long accepted = Math.min(amount, missingFE);
+        if (accepted <= 0) {
+            return 0;
+        }
+
+        context.addCloseCallback((txn, result) -> {
             if (result.wasCommitted()) {
-                bottom.shell.setProgress(bottom.shell.getProgress() + (float)amount / requiredEnergyAmount);
+                bottom.shell.setProgress(
+                    bottom.shell.getProgress() + (float)accepted / capacity
+                );
             }
         });
-        return (long) MathHelper.clamp(amount, 0, maxEnergy);
+
+        return accepted;
     }
 
     @Override
