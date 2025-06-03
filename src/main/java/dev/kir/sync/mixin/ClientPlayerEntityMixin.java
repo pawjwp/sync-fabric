@@ -197,7 +197,8 @@ abstract class ClientPlayerEntityMixin extends AbstractClientPlayerEntity implem
 
     @Override
     public void onKillableEntityDeath() {
-        boolean canRespawn = this.isArtificial() && this.shellsById.size() != 0;
+        boolean canRespawn = this.shellsById.values().stream()
+        .anyMatch(s -> this.canBeApplied(s) && s.getProgress() >= ShellState.PROGRESS_DONE);
         BlockPos pos = this.getBlockPos();
         Identifier world = WorldUtil.getId(this.getWorld());
         Comparator<ShellState> comparator = ShellPriority.asComparator(world, pos, Sync.getConfig().syncPriority().stream().map(SyncConfig.ShellPriorityEntry::priority));
