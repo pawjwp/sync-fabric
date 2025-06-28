@@ -71,6 +71,7 @@ public class ArrowButtonWidget extends ButtonWidget {
 
     @Override
     protected void renderButton(DrawContext drawContext, int mouseX, int mouseY, float delta) {
+        drawContext.getMatrices().push();
         this.type.transform(drawContext.getMatrices(), this.getX(), this.getY(), this.width, this.height);
         RenderSystemUtil.drawRectangle(drawContext.getMatrices(), this.x0, this.y0, this.stickWidth, this.stickHeight, this.borderRadius, 1F, -this.angle, this.step, color[0], color[1], color[2], color[3]);
         RenderSystemUtil.drawRectangle(drawContext.getMatrices(), this.x1, this.y1, this.stickWidth, this.stickHeight, this.borderRadius, 1F, this.angle, this.step, color[0], color[1], color[2], color[3]);
