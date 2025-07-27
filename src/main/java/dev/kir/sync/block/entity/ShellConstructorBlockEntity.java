@@ -111,7 +111,15 @@ public class ShellConstructorBlockEntity extends AbstractShellContainerBlockEnti
     @Override
     public long insert(long amount, TransactionContext context) {
         ShellConstructorBlockEntity bottom = (ShellConstructorBlockEntity)this.getBottomPart().orElse(null);
-        if (bottom == null || bottom.shell == null || bottom.shell.getProgress() >= ShellState.PROGRESS_DONE) {
+        if (bottom == null || bottom.shell == null) {
+            return 0;
+        }
+
+        if (ShellConstructorBlock.isOpen(bottom.getCachedState())) {
+            return 0;
+        }
+
+        if (bottom.shell.getProgress() >= ShellState.PROGRESS_DONE) {
             return 0;
         }
 
