@@ -104,18 +104,13 @@ public class ShellConstructorBlockEntity extends AbstractShellContainerBlockEnti
     }
 
     @Override
-    public boolean supportsExtraction() {
-        return false;
-    }
-
-    @Override
     public long insert(long amount, TransactionContext context) {
         ShellConstructorBlockEntity bottom = (ShellConstructorBlockEntity)this.getBottomPart().orElse(null);
         if (bottom == null || bottom.shell == null) {
             return 0;
         }
 
-        if (ShellConstructorBlock.isOpen(bottom.getCachedState())) {
+        if (BlockPosUtil.hasPlayerInside(bottom.getPos(), bottom.getWorld())) {
             return 0;
         }
 
