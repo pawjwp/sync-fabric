@@ -456,7 +456,7 @@ abstract class ServerPlayerEntityMixin extends PlayerEntity implements ServerShe
         playerManager.sendCommandTree(serverPlayer);
         serverWorld.removePlayer(serverPlayer, RemovalReason.CHANGED_DIMENSION);
         this.unsetRemoved();
-        serverPlayer.setWorld(targetWorld);
+        serverPlayer.setServerWorld(targetWorld);
         targetWorld.onPlayerChangeDimension(serverPlayer);
         this.networkHandler.requestTeleport(x, y, z, yaw, pitch);
         this.worldChanged(targetWorld);
